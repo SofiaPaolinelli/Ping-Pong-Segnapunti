@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  
+  <!-- Meta Tag per Installazione PWA/App Mobile -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Segnapunti Ping Pong">
+  <meta name="theme-color" content="#ffffff">
+
+  <title>Segnapunti Ping Pong</title>
+  <!-- Icona per iPhone / iPad (iOS) -->
+  <link rel="apple-touch-icon" sizes="180x180" href="logo.png">
+  
+  <!-- Icona per Smartphone Android e Browser Web -->
+  <link rel="icon" type="image/png" sizes="192x192" href="logo.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="logo.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Link al Manifest PWA -->
+  <link rel="manifest" href="manifest.json">
+  
+  <!-- Script per il Service Worker (Funzionamento Offline e Installazione) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js');
+      });
+    }
+  </script>
+
+  <style>
+    body {
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    .score-digit {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+      line-height: 0.85;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 9999px;
+    }
+
+    /* OTTIMIZZAZIONE PER DISPOSITIVI IN ORIZZONTALE (LANDSCAPE) */
+    @media (orientation: landscape) and (max-height: 550px) {
+      .landscape-compact-header {
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.25rem !important;
+      }
+      .landscape-compact-logo {
+        height: 3rem !important;
+        margin-bottom: 0.25rem !important;
+      }
+      .landscape-score-digit {
+        font-size: 35vh !important;
+      }
+      .landscape-card-padding {
+        padding: 0.5rem !important;
+      }
+      .landscape-hide-subtext {
+        display: none !important;
+      }
+      .landscape-table-container {
+        max-height: 5.5rem !important;
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.25rem !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-white text-slate-900 min-h-screen flex flex-col justify-between">
+
+  <!-- ==================== SCHERMATA CONFIGURAZIONE ==================== -->
+  <div id="setup-view" class="max-w-2xl mx-auto w-full p-4 flex-1 flex flex-col justify-between">
+    <div>
+      <!-- Header con LOGO -->
+      <div class="text-center my-3 landscape-compact-header">
+        <img id="tournament-logo" src="logo.png" alt="Logo Torneo" class="h-24 sm:h-28 max-w-[200px] w-auto mx-auto mb-2 object-contain landscape-compact-logo">
+        <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">Torneo Tennistavolo San Cassiano a Vico</h1>
+        <p class="text-xs text-slate-500 mt-0.5 landscape-hide-subtext">Imposta la partita o consulta lo storico</p>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200 mb-4">
+        <button id="tab-btn-setup" onclick="switchSetupTab('setup')" class="py-2 px-3 rounded-lg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 bg-slate-900 text-white shadow">
+          <i data-lucide="play-circle" class="w-4 h-4"></i> Nuova Partita
+        </button>
+        <button id="tab-btn-archive" onclick="switchSetupTab('archive')" class="py-2 px-3 rounded-lg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900">
+          <i data-lucide="archive" class="w-4 h-4"></i> Archivio <span id="archive-count-badge" class="bg-slate-200 text-slate-800 text-xs px-2 py-0.5 rounded-full border border-slate-300">0</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: FORM CONFIGURAZIONE -->
+      <div id="tab-content-setup" class="space-y-3">
+        <!-- Nomi Giocatori -->
+        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-4 space-y-2">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+            <i data-lucide="users" class="w-4 h-4 text-slate-700"></i> Giocatori / Coppie
+          </h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Giocatore 1 (Rosso)</label>
+              <input type="text" id="p1-name" value="Giocatore 1" class="w-full bg-white border border-slate-300 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 rounded-xl px-3 py-1.5 text-sm text-slate-900 font-semibold outline-none transition">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Giocatore 2 (Blu)</label>
+              <input type="text" id="p2-name" value="Giocatore 2" class="w-full bg-white border border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl px-3 py-1.5 text-sm text-slate-900 font-semibold outline-none transition">
+            </div>
+          </div>
+        </div>
+
+        <!-- Regole di Gioco -->
+        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-4 space-y-2">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+            <i data-lucide="settings" class="w-4 h-4 text-slate-700"></i> Regole Partita
+          </h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Punti per Set</label>
+              <select id="points-to-win" class="w-full bg-white border border-slate-300 focus:border-slate-800 rounded-xl px-3 py-1.5 text-slate-900 font-semibold outline-none transition text-xs sm:text-sm">
+                <option value="11" selected>11 punti (Ufficiale)</option>
+                <option value="21">21 punti (Classico)</option>
+                <option value="7">7 punti (Rapido)</option>
+                <option value="5">5 punti (Flash)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Formato Incontro</label>
+              <select id="sets-to-win" class="w-full bg-white border border-slate-300 focus:border-slate-800 rounded-xl px-3 py-1.5 text-slate-900 font-semibold outline-none transition text-xs sm:text-sm">
+                <option value="1">Set singolo</option>
+                <option value="2" selected>Al meglio dei 3 set (vince chi fa 2)</option>
+                <option value="3">Al meglio dei 5 set (vince chi fa 3)</option>
+                <option value="4">Al meglio dei 7 set (vince chi fa 4)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Cambio Battuta ogni</label>
+              <select id="serve-frequency" class="w-full bg-white border border-slate-300 focus:border-slate-800 rounded-xl px-3 py-1.5 text-slate-900 font-semibold outline-none transition text-xs sm:text-sm">
+                <option value="2" selected>2 Punti</option>
+                <option value="5">5 Punti</option>
+                <option value="1">1 Punto</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Inizia a servire</label>
+              <select id="first-server" class="w-full bg-white border border-slate-300 focus:border-slate-800 rounded-xl px-3 py-1.5 text-slate-900 font-semibold outline-none transition text-xs sm:text-sm">
+                <option value="1">Giocatore 1</option>
+                <option value="2">Giocatore 2</option>
+                <option value="random">Sorteggio Casuale</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Vantaggi (Deuce) -->
+          <div class="flex items-center justify-between pt-2 border-t border-slate-200">
+            <div>
+              <div class="text-xs font-bold text-slate-800">Vantaggi</div>
+              <div class="text-[10px] sm:text-[11px] text-slate-500">Serve lo scarto di 2 punti per vincere</div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="deuce-enabled" checked class="sr-only peer">
+              <div class="w-10 h-5 sm:w-11 sm:h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 sm:after:h-5 sm:after:w-5 after:transition-all peer-checked:bg-slate-900"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: ARCHIVIO PARTITE -->
+      <div id="tab-content-archive" class="hidden space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500">Partite Salvate</h2>
+          <div class="flex gap-2">
+            <button onclick="exportArchiveCSV()" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition flex items-center gap-1.5">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i> Esporta CSV
+            </button>
+            <button onclick="clearArchive()" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold rounded-lg border border-rose-200 transition flex items-center gap-1.5">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Svuota
+            </button>
+          </div>
+        </div>
+
+        <div id="archive-list" class="space-y-2.5">
+          <!-- Inserito dinamicamente da JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Pulsante Inizia Partita -->
+    <div id="start-btn-container" class="mt-3 pt-2 border-t border-slate-200">
+      <button onclick="startMatch()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black text-base sm:text-lg py-3 rounded-2xl shadow-lg active:scale-[0.99] transition flex items-center justify-center gap-2">
+        <i data-lucide="play" class="w-5 h-5 sm:w-6 sm:h-6 fill-current"></i> INIZIA PARTITA
+      </button>
+    </div>
+  </div>
+
+
+  <!-- ==================== SCHERMATA DI GIOCO (ORIENTAMENTO VERTICALE ED ORIZZONTALE) ==================== -->
+  <div id="game-view" class="hidden fixed inset-0 bg-white text-slate-900 z-50 flex flex-col justify-between overflow-hidden">
+    
+    <!-- HEADER IN PARTITA -->
+    <div class="bg-white border-b border-slate-200 px-3 py-1.5 sm:px-4 sm:py-2 flex items-center justify-between shadow-sm shrink-0">
+      <!-- Pulsante Esci -->
+      <button onclick="confirmExitMatch()" class="p-1.5 sm:p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition">
+        <i data-lucide="arrow-left" class="w-5 h-5 sm:w-6 sm:h-6"></i>
+      </button>
+
+      <!-- NUMERO DEL SET GRANDE AL CENTRO -->
+      <div class="text-center">
+        <div class="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest text-slate-400">PUNTEGGIO SET</div>
+        <div class="text-2xl sm:text-4xl font-black text-slate-900 tracking-wider leading-none">
+          <span id="game-sets-summary">0 - 0</span>
+        </div>
+      </div>
+
+      <!-- TIMER PARTITA E PULSANTE CAMBIO CAMPO A DESTRA -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <button id="swap-sides-btn" onclick="swapSides()" class="px-2 py-1 sm:px-2.5 sm:py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 transition flex items-center gap-1.5" title="Inverti posizione campi">
+          <i data-lucide="repeat" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+          <span class="hidden sm:inline">Cambio campo</span>
+        </button>
+        <div class="flex items-center gap-1 bg-slate-100 px-2 sm:px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 font-mono text-xs font-bold">
+          <i data-lucide="clock" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-600"></i>
+          <span id="match-timer">00:00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AREA SEGNAPUNTI PRINCIPALE (A FLESSIBILITÀ ORIZZONTALE E VERTICALE) -->
+    <div id="cards-container" class="flex-1 grid grid-cols-2 gap-2 sm:gap-3 p-2 sm:p-3 relative overflow-hidden bg-slate-50">
+      
+      <!-- GIOCATORE 1 (Rosso) -->
+      <div id="card-p1" onclick="addPoint(1)" class="bg-white border-2 border-slate-200 rounded-2xl sm:rounded-3xl landscape-card-padding p-2.5 sm:p-3.5 flex flex-col justify-between items-center relative active:scale-[0.99] transition cursor-pointer selection:bg-transparent shadow-sm overflow-hidden">
+        
+        <!-- Intestazione Card -->
+        <div class="w-full flex items-center justify-between gap-1.5">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-rose-500 shrink-0"></span>
+            <span id="game-p1-name" class="font-black text-sm sm:text-xl md:text-2xl text-slate-900 truncate">Giocatore 1</span>
+          </div>
+          
+          <!-- INDICATORE BATTUTA -->
+          <div id="p1-serve-badge" class="hidden bg-amber-400 text-slate-950 font-black text-[10px] sm:text-xs px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full shadow flex items-center gap-1 animate-pulse border border-amber-300 shrink-0">
+            <i data-lucide="zap" class="w-3 h-3 fill-current"></i> <span class="landscape-hide-subtext">BATTUTA</span>
+          </div>
+        </div>
+
+        <!-- NUMERO PUNTEGGIO GIGANTE CON RIDIMENSIONAMENTO AUTOMATICO -->
+        <div class="my-auto py-0 flex items-center justify-center">
+          <div id="p1-score" class="score-digit text-[6rem] sm:text-[10rem] md:text-[13rem] landscape-score-digit font-black text-rose-600 tracking-tighter text-center">0</div>
+        </div>
+
+        <!-- Barra Inferiore Card -->
+        <div class="w-full flex items-center justify-between pt-1 border-t border-slate-100">
+          <div class="text-[10px] sm:text-xs font-bold text-slate-500 uppercase">
+            SET: <span id="p1-sets-count" class="text-slate-900 text-sm sm:text-base font-black">0</span>
+          </div>
+          <button onclick="event.stopPropagation(); removePoint(1);" class="px-2 py-1 sm:px-3 sm:py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] sm:text-xs font-bold flex items-center gap-1 border border-slate-200">
+            <i data-lucide="minus" class="w-3 h-3 sm:w-4 sm:h-4"></i> -1
+          </button>
+        </div>
+      </div>
+
+      <!-- GIOCATORE 2 (Blu) -->
+      <div id="card-p2" onclick="addPoint(2)" class="bg-white border-2 border-slate-200 rounded-2xl sm:rounded-3xl landscape-card-padding p-2.5 sm:p-3.5 flex flex-col justify-between items-center relative active:scale-[0.99] transition cursor-pointer selection:bg-transparent shadow-sm overflow-hidden">
+        
+        <!-- Intestazione Card -->
+        <div class="w-full flex items-center justify-between gap-1.5">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="w-3 h-3 sm:w-4 sm:h-4 rounded-full bg-blue-500 shrink-0"></span>
+            <span id="game-p2-name" class="font-black text-sm sm:text-xl md:text-2xl text-slate-900 truncate">Giocatore 2</span>
+          </div>
+
+          <!-- INDICATORE BATTUTA -->
+          <div id="p2-serve-badge" class="hidden bg-amber-400 text-slate-950 font-black text-[10px] sm:text-xs px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full shadow flex items-center gap-1 animate-pulse border border-amber-300 shrink-0">
+            <i data-lucide="zap" class="w-3 h-3 fill-current"></i> <span class="landscape-hide-subtext">BATTUTA</span>
+          </div>
+        </div>
+
+        <!-- NUMERO PUNTEGGIO GIGANTE CON RIDIMENSIONAMENTO AUTOMATICO -->
+        <div class="my-auto py-0 flex items-center justify-center">
+          <div id="p2-score" class="score-digit text-[6rem] sm:text-[10rem] md:text-[13rem] landscape-score-digit font-black text-blue-600 tracking-tighter text-center">0</div>
+        </div>
+
+        <!-- Barra Inferiore Card -->
+        <div class="w-full flex items-center justify-between pt-1 border-t border-slate-100">
+          <div class="text-[10px] sm:text-xs font-bold text-slate-500 uppercase">
+            SET: <span id="p2-sets-count" class="text-slate-900 text-sm sm:text-base font-black">0</span>
+          </div>
+          <button onclick="event.stopPropagation(); removePoint(2);" class="px-2 py-1 sm:px-3 sm:py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] sm:text-xs font-bold flex items-center gap-1 border border-slate-200">
+            <i data-lucide="minus" class="w-3 h-3 sm:w-4 sm:h-4"></i> -1
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TABELLA PARZIALI SET IN PARTITA (COMPATTA) -->
+    <div class="bg-white border-t border-slate-200 p-2 sm:p-3 max-h-36 sm:max-h-44 overflow-y-auto custom-scrollbar shadow-sm shrink-0 landscape-table-container">
+      <div class="max-w-2xl mx-auto space-y-1 sm:space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+            <i data-lucide="list" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-700"></i> Parziali
+          </div>
+          <button onclick="undoLastPoint()" class="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-slate-100 hover:bg-slate-200 text-[10px] sm:text-xs text-slate-700 rounded-lg border border-slate-200 font-semibold flex items-center gap-1">
+            <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Annulla punto
+          </button>
+        </div>
+
+        <!-- TABELLA -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-[11px] sm:text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200 text-slate-500">
+                <th class="py-0.5 px-1 font-semibold">Giocatore</th>
+                <th id="th-set-1" class="py-0.5 px-1 text-center font-semibold">S1</th>
+                <th id="th-set-2" class="py-0.5 px-1 text-center font-semibold">S2</th>
+                <th id="th-set-3" class="py-0.5 px-1 text-center font-semibold">S3</th>
+                <th id="th-set-4" class="py-0.5 px-1 text-center font-semibold">S4</th>
+                <th id="th-set-5" class="py-0.5 px-1 text-center font-semibold">S5</th>
+                <th id="th-set-6" class="py-0.5 px-1 text-center font-semibold">S6</th>
+                <th id="th-set-7" class="py-0.5 px-1 text-center font-semibold">S7</th>
+                <th class="py-0.5 px-1 text-right font-semibold">Tot</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 font-medium">
+              <tr>
+                <td id="table-p1-name" class="py-0.5 px-1 text-rose-600 font-bold truncate max-w-[70px] sm:max-w-[100px]">G1</td>
+                <td id="table-p1-s1" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p1-s2" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p1-s3" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p1-s4" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p1-s5" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p1-s6" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p1-s7" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p1-total" class="py-0.5 px-1 text-right font-black text-slate-900">0</td>
+              </tr>
+              <tr>
+                <td id="table-p2-name" class="py-0.5 px-1 text-blue-600 font-bold truncate max-w-[70px] sm:max-w-[100px]">G2</td>
+                <td id="table-p2-s1" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p2-s2" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p2-s3" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p2-s4" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p2-s5" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p2-s6" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p2-s7" class="py-0.5 px-1 text-center text-slate-400">-</td>
+                <td id="table-p2-total" class="py-0.5 px-1 text-right font-black text-slate-900">0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==================== MODALE VITTORIA / FINE PARTITA ==================== -->
+  <div id="victory-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 max-w-sm w-full text-center shadow-2xl space-y-3 sm:space-y-4 text-slate-900">
+      <div class="inline-flex items-center justify-center p-3.5 bg-amber-50 border border-amber-200 text-amber-500 rounded-2xl">
+        <i data-lucide="crown" class="w-8 h-8 sm:w-10 sm:h-10"></i>
+      </div>
+      <div>
+        <h3 class="text-xs font-bold uppercase tracking-widest text-slate-500">Vincitore dell'Incontro</h3>
+        <div id="winner-name" class="text-xl sm:text-2xl font-black text-slate-900 mt-1">Giocatore 1</div>
+        <p id="winner-score-summary" class="text-xs sm:text-sm text-slate-700 font-semibold mt-0.5">Vittoria per 2 - 1</p>
+      </div>
+
+      <div id="modal-set-summary" class="bg-slate-50 rounded-xl p-2.5 sm:p-3 text-xs space-y-1 border border-slate-200">
+        <!-- Generato via JS -->
+      </div>
+
+      <div class="pt-1">
+        <button onclick="closeVictoryModalAndShowArchive()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 sm:py-3 rounded-xl transition shadow-md text-sm">
+          Salva e Vai all'Archivio
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==================== LOGICA JAVASCRIPT ==================== -->
+  <script>
+    // --- STATO APPLICAZIONE ---
+    let config = {
+      p1Name: 'Giocatore 1',
+      p2Name: 'Giocatore 2',
+      pointsToWin: 11,
+      setsToWin: 2,
+      serveFrequency: 2,
+      deuceEnabled: true,
+      firstServer: 1
+    };
+
+    let match = {
+      p1Score: 0,
+      p2Score: 0,
+      p1Sets: 0,
+      p2Sets: 0,
+      currentSetIndex: 1,
+      currentServer: 1,
+      completedSets: [],
+      history: [],
+      startTime: null,
+      timerInterval: null,
+      elapsedSeconds: 0,
+      isSwapped: false
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      loadArchiveUI();
+    });
+
+    // --- TAB CONFIGURAZIONE / ARCHIVIO ---
+    function switchSetupTab(tab) {
+      const btnSetup = document.getElementById('tab-btn-setup');
+      const btnArchive = document.getElementById('tab-btn-archive');
+      const contentSetup = document.getElementById('tab-content-setup');
+      const contentArchive = document.getElementById('tab-content-archive');
+      const startBtn = document.getElementById('start-btn-container');
+
+      if (tab === 'setup') {
+        btnSetup.className = "py-2 px-3 rounded-lg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 bg-slate-900 text-white shadow";
+        btnArchive.className = "py-2 px-3 rounded-lg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900";
+        contentSetup.classList.remove('hidden');
+        contentArchive.classList.add('hidden');
+        startBtn.classList.remove('hidden');
+      } else {
+        btnArchive.className = "py-2 px-3 rounded-lg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 bg-slate-900 text-white shadow";
+        btnSetup.className = "py-2 px-3 rounded-lg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900";
+        contentArchive.classList.remove('hidden');
+        contentSetup.classList.add('hidden');
+        startBtn.classList.add('hidden');
+        loadArchiveUI();
+      }
+    }
+
+    // --- AVVIO PARTITA ---
+    function startMatch() {
+      config.p1Name = document.getElementById('p1-name').value.trim() || 'Giocatore 1';
+      config.p2Name = document.getElementById('p2-name').value.trim() || 'Giocatore 2';
+      config.pointsToWin = parseInt(document.getElementById('points-to-win').value);
+      config.setsToWin = parseInt(document.getElementById('sets-to-win').value);
+      config.serveFrequency = parseInt(document.getElementById('serve-frequency').value);
+      config.deuceEnabled = document.getElementById('deuce-enabled').checked;
+
+      const serverChoice = document.getElementById('first-server').value;
+      if (serverChoice === 'random') {
+        config.firstServer = Math.random() < 0.5 ? 1 : 2;
+      } else {
+        config.firstServer = parseInt(serverChoice);
+      }
+
+      match = {
+        p1Score: 0,
+        p2Score: 0,
+        p1Sets: 0,
+        p2Sets: 0,
+        currentSetIndex: 1,
+        currentServer: config.firstServer,
+        completedSets: [],
+        history: [],
+        startTime: new Date(),
+        elapsedSeconds: 0,
+        timerInterval: null,
+        isSwapped: false
+      };
+
+      document.getElementById('game-p1-name').innerText = config.p1Name;
+      document.getElementById('game-p2-name').innerText = config.p2Name;
+      document.getElementById('table-p1-name').innerText = config.p1Name;
+      document.getElementById('table-p2-name').innerText = config.p2Name;
+
+      for (let i = 1; i <= 7; i++) {
+        const c1 = document.getElementById(`table-p1-s${i}`);
+        const c2 = document.getElementById(`table-p2-s${i}`);
+        if (c1) c1.innerText = '-';
+        if (c2) c2.innerText = '-';
+      }
+
+      updateScoreboardUI();
+      startTimer();
+
+      document.getElementById('setup-view').classList.add('hidden');
+      document.getElementById('game-view').classList.remove('hidden');
+    }
+
+    // --- TIMER ---
+    function startTimer() {
+      if (match.timerInterval) clearInterval(match.timerInterval);
+      match.timerInterval = setInterval(() => {
+        match.elapsedSeconds++;
+        const mins = String(Math.floor(match.elapsedSeconds / 60)).padStart(2, '0');
+        const secs = String(match.elapsedSeconds % 60).padStart(2, '0');
+        document.getElementById('match-timer').innerText = `${mins}:${secs}`;
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (match.timerInterval) clearInterval(match.timerInterval);
+    }
+
+    // --- BATTUTA ---
+    function updateServer() {
+      const totalPointsInSet = match.p1Score + match.p2Score;
+      const isDeuceState = config.deuceEnabled && 
+                           match.p1Score >= (config.pointsToWin - 1) && 
+                           match.p2Score >= (config.pointsToWin - 1);
+
+      const freq = isDeuceState ? 1 : config.serveFrequency;
+      
+      const setInitialServer = ((match.currentSetIndex - 1) % 2 === 0) 
+        ? config.firstServer 
+        : (config.firstServer === 1 ? 2 : 1);
+
+      const servesDone = Math.floor(totalPointsInSet / freq);
+      match.currentServer = (servesDone % 2 === 0) 
+        ? setInitialServer 
+        : (setInitialServer === 1 ? 2 : 1);
+    }
+
+    // --- CAMBIO CAMPO ---
+    function swapSides() {
+      match.isSwapped = !match.isSwapped;
+      updateScoreboardUI();
+    }
+
+    // --- GESTIONE PUNTI ---
+    function saveHistoryForUndo() {
+      match.history.push(JSON.parse(JSON.stringify({
+        p1Score: match.p1Score,
+        p2Score: match.p2Score,
+        p1Sets: match.p1Sets,
+        p2Sets: match.p2Sets,
+        currentSetIndex: match.currentSetIndex,
+        currentServer: match.currentServer,
+        completedSets: match.completedSets,
+        isSwapped: match.isSwapped
+      })));
+    }
+
+    function addPoint(player) {
+      saveHistoryForUndo();
+
+      if (player === 1) match.p1Score++;
+      else match.p2Score++;
+
+      checkSetWin();
+      updateServer();
+      updateScoreboardUI();
+    }
+
+    function removePoint(player) {
+      if (player === 1 && match.p1Score > 0) {
+        saveHistoryForUndo();
+        match.p1Score--;
+      } else if (player === 2 && match.p2Score > 0) {
+        saveHistoryForUndo();
+        match.p2Score--;
+      }
+      updateServer();
+      updateScoreboardUI();
+    }
+
+    function undoLastPoint() {
+      if (match.history.length === 0) return;
+      const lastState = match.history.pop();
+      match.p1Score = lastState.p1Score;
+      match.p2Score = lastState.p2Score;
+      match.p1Sets = lastState.p1Sets;
+      match.p2Sets = lastState.p2Sets;
+      match.currentSetIndex = lastState.currentSetIndex;
+      match.currentServer = lastState.currentServer;
+      match.completedSets = lastState.completedSets;
+      match.isSwapped = lastState.isSwapped || false;
+
+      updateScoreboardUI();
+    }
+
+    // --- CONTROLLO SET E MATCH ---
+    function checkSetWin() {
+      const p1 = match.p1Score;
+      const p2 = match.p2Score;
+      const target = config.pointsToWin;
+
+      let setWonBy = 0;
+
+      if (config.deuceEnabled) {
+        if (p1 >= target && (p1 - p2) >= 2) setWonBy = 1;
+        else if (p2 >= target && (p2 - p1) >= 2) setWonBy = 2;
+      } else {
+        if (p1 >= target) setWonBy = 1;
+        else if (p2 >= target) setWonBy = 2;
+      }
+
+      if (setWonBy > 0) {
+        match.completedSets.push({
+          set: match.currentSetIndex,
+          p1: p1,
+          p2: p2,
+          winner: setWonBy
+        });
+
+        if (setWonBy === 1) match.p1Sets++;
+        else match.p2Sets++;
+
+        if (match.p1Sets === config.setsToWin || match.p2Sets === config.setsToWin) {
+          finishMatch(setWonBy);
+        } else {
+          match.currentSetIndex++;
+          match.p1Score = 0;
+          match.p2Score = 0;
+        }
+      }
+    }
+
+    function finishMatch(winner) {
+      stopTimer();
+      saveMatchToArchive(winner);
+
+      const winnerName = winner === 1 ? config.p1Name : config.p2Name;
+      document.getElementById('winner-name').innerText = winnerName;
+      document.getElementById('winner-score-summary').innerText = `Vittoria per ${match.p1Sets} a ${match.p2Sets}`;
+
+      let htmlSets = '';
+      match.completedSets.forEach(s => {
+        htmlSets += `<div class="flex justify-between text-slate-700">
+          <span>Set ${s.set}</span>
+          <span class="font-mono font-bold">${s.p1} - ${s.p2}</span>
+        </div>`;
+      });
+      document.getElementById('modal-set-summary').innerHTML = htmlSets;
+      document.getElementById('victory-modal').classList.remove('hidden');
+    }
+
+    // --- AGGIORNAMENTO UI ---
+    function updateScoreboardUI() {
+      document.getElementById('p1-score').innerText = match.p1Score;
+      document.getElementById('p2-score').innerText = match.p2Score;
+      document.getElementById('p1-sets-count').innerText = match.p1Sets;
+      document.getElementById('p2-sets-count').innerText = match.p2Sets;
+      document.getElementById('game-sets-summary').innerText = `${match.p1Sets} - ${match.p2Sets}`;
+
+      // Inversione posizione visuale delle schede (Cambio campo)
+      const card1 = document.getElementById('card-p1');
+      const card2 = document.getElementById('card-p2');
+      const swapBtn = document.getElementById('swap-sides-btn');
+
+      if (card1 && card2) {
+        if (match.isSwapped) {
+          card1.style.order = '2';
+          card2.style.order = '1';
+        } else {
+          card1.style.order = '1';
+          card2.style.order = '2';
+        }
+      }
+
+      if (swapBtn) {
+        if (match.isSwapped) {
+          swapBtn.className = "px-2 py-1 sm:px-2.5 sm:py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5 shadow-sm";
+        } else {
+          swapBtn.className = "px-2 py-1 sm:px-2.5 sm:py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg border border-slate-200 transition flex items-center gap-1.5";
+        }
+      }
+
+      // Badge Battuta
+      const p1Badge = document.getElementById('p1-serve-badge');
+      const p2Badge = document.getElementById('p2-serve-badge');
+      if (match.currentServer === 1) {
+        p1Badge.classList.remove('hidden');
+        p2Badge.classList.add('hidden');
+      } else {
+        p1Badge.classList.add('hidden');
+        p2Badge.classList.remove('hidden');
+      }
+
+      // Tabella Parziali
+      match.completedSets.forEach(s => {
+        const cell1 = document.getElementById(`table-p1-s${s.set}`);
+        const cell2 = document.getElementById(`table-p2-s${s.set}`);
+        if (cell1 && cell2) {
+          cell1.innerText = s.p1;
+          cell2.innerText = s.p2;
+          cell1.className = s.winner === 1 ? "py-0.5 px-1 text-center font-bold text-rose-600" : "py-0.5 px-1 text-center text-slate-400";
+          cell2.className = s.winner === 2 ? "py-0.5 px-1 text-center font-bold text-blue-600" : "py-0.5 px-1 text-center text-slate-400";
+        }
+      });
+
+      const current1 = document.getElementById(`table-p1-s${match.currentSetIndex}`);
+      const current2 = document.getElementById(`table-p2-s${match.currentSetIndex}`);
+      if (current1 && current2 && match.p1Sets < config.setsToWin && match.p2Sets < config.setsToWin) {
+        current1.innerText = match.p1Score;
+        current2.innerText = match.p2Score;
+        current1.className = "py-0.5 px-1 text-center text-slate-900 font-semibold";
+        current2.className = "py-0.5 px-1 text-center text-slate-900 font-semibold";
+      }
+
+      document.getElementById('table-p1-total').innerText = match.p1Sets;
+      document.getElementById('table-p2-total').innerText = match.p2Sets;
+    }
+
+    function confirmExitMatch() {
+      if (confirm("Vuoi davvero abbandonare la partita in corso?")) {
+        stopTimer();
+        document.getElementById('game-view').classList.add('hidden');
+        document.getElementById('setup-view').classList.remove('hidden');
+      }
+    }
+
+    function closeVictoryModalAndShowArchive() {
+      document.getElementById('victory-modal').classList.add('hidden');
+      document.getElementById('game-view').classList.add('hidden');
+      document.getElementById('setup-view').classList.remove('hidden');
+      switchSetupTab('archive');
+    }
+
+    // --- ARCHIVIO LOCALSTORAGE ---
+    function getArchive() {
+      try {
+        return JSON.parse(localStorage.getItem('pingpong_archive') || '[]');
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveArchive(data) {
+      localStorage.setItem('pingpong_archive', JSON.stringify(data));
+    }
+
+    function saveMatchToArchive(winner) {
+      const archive = getArchive();
+      const matchRecord = {
+        id: Date.now(),
+        date: new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }),
+        p1Name: config.p1Name,
+        p2Name: config.p2Name,
+        p1Sets: match.p1Sets,
+        p2Sets: match.p2Sets,
+        winner: winner,
+        winnerName: winner === 1 ? config.p1Name : config.p2Name,
+        durationSeconds: match.elapsedSeconds,
+        setsDetail: match.completedSets
+      };
+      archive.unshift(matchRecord);
+      saveArchive(archive);
+    }
+
+    function loadArchiveUI() {
+      const archive = getArchive();
+      document.getElementById('archive-count-badge').innerText = archive.length;
+
+      const container = document.getElementById('archive-list');
+      if (archive.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-6 bg-slate-50 rounded-2xl border border-slate-200 text-slate-400 text-xs">
+            Nessuna partita salvata nell'archivio.
+          </div>`;
+        return;
+      }
+
+      let html = '';
+      archive.forEach(item => {
+        const durationMin = Math.floor(item.durationSeconds / 60);
+        const durationSec = item.durationSeconds % 60;
+        const setString = item.setsDetail.map(s => `${s.p1}-${s.p2}`).join(' | ');
+
+        html += `
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-1.5">
+            <div class="flex items-center justify-between text-xs text-slate-500">
+              <span>📅 ${item.date}</span>
+              <span>⏱️ ${durationMin}m ${durationSec}s</span>
+            </div>
+            
+            <div class="flex items-center justify-between">
+              <div class="font-bold text-xs sm:text-sm">
+                <span class="${item.winner === 1 ? 'text-rose-600 font-extrabold' : 'text-slate-800'}">${item.p1Name}</span>
+                <span class="text-slate-400 mx-1">vs</span>
+                <span class="${item.winner === 2 ? 'text-blue-600 font-extrabold' : 'text-slate-800'}">${item.p2Name}</span>
+              </div>
+              <div class="text-sm sm:text-base font-black bg-white px-2 py-0.5 rounded-lg border border-slate-300">
+                ${item.p1Sets} - ${item.p2Sets}
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-200">
+              <div class="text-slate-500 text-[11px]">
+                Parziali: <span class="font-mono text-slate-800">${setString}</span>
+              </div>
+              <button onclick="deleteMatch(${item.id})" class="text-rose-500 hover:text-rose-700 p-0.5">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>`;
+      });
+
+      container.innerHTML = html;
+      lucide.createIcons();
+    }
+
+    function deleteMatch(id) {
+      if (confirm("Eliminare questa partita dall'archivio?")) {
+        let archive = getArchive();
+        archive = archive.filter(m => m.id !== id);
+        saveArchive(archive);
+        loadArchiveUI();
+      }
+    }
+
+    function clearArchive() {
+      if (confirm("Sei sicuro di voler cancellare TUTTE le partite dall'archivio?")) {
+        saveArchive([]);
+        loadArchiveUI();
+      }
+    }
+
+    function exportArchiveCSV() {
+      const archive = getArchive();
+      if (archive.length === 0) {
+        alert("L'archivio è vuoto. Nessun dato da esportare.");
+        return;
+      }
+
+      let csvContent = "data:text/csv;charset=utf-8,ID,Data,Giocatore 1,Giocatore 2,Set G1,Set G2,Vincitore,Durata (sec),Parziali Set\n";
+
+      archive.forEach(m => {
+        const setDetails = m.setsDetail.map(s => `${s.p1}-${s.p2}`).join(';');
+        csvContent += `"${m.id}","${m.date}","${m.p1Name}","${m.p2Name}",${m.p1Sets},${m.p2Sets},"${m.winnerName}",${m.durationSeconds},"${setDetails}"\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `torneo_ping_pong_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+  
+  <!-- Banner di Installazione (spostato in alto per non coprire i comandi inferiori) -->
+  <div id="install-banner" class="hidden fixed top-4 left-4 right-4 bg-slate-900 text-white p-3 rounded-2xl shadow-2xl flex items-center justify-between z-50">
+    <div class="flex items-center gap-2">
+      <img src="logo.png" class="w-8 h-8 rounded-lg object-cover">
+      <span class="text-xs font-bold">Installa l'App sul telefono</span>
+    </div>
+    <button id="install-btn" class="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl transition">
+      INSTALLA
+    </button>
+  </div>
+  
+  <script>
+    let deferredPrompt;
+    const installBanner = document.getElementById('install-banner');
+    const installBtn = document.getElementById('install-btn');
+  
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (installBanner) installBanner.classList.remove('hidden');
+    });
+  
+    if (installBtn) {
+      installBtn.addEventListener('click', async () => {
+        if (installBanner) installBanner.classList.add('hidden');
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          deferredPrompt = null;
+        }
+      });
+    }
+  </script>
+</body>
+</html>
