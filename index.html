@@ -654,7 +654,13 @@
       document.getElementById('p2-score').innerText = match.p2Score;
       document.getElementById('p1-sets-count').innerText = match.p1Sets;
       document.getElementById('p2-sets-count').innerText = match.p2Sets;
-      document.getElementById('game-sets-summary').innerText = `${match.p1Sets} - ${match.p2Sets}`;
+
+      // Inversione riepilogo set nell'header
+      if (match.isSwapped) {
+        document.getElementById('game-sets-summary').innerText = `${match.p2Sets} - ${match.p1Sets}`;
+      } else {
+        document.getElementById('game-sets-summary').innerText = `${match.p1Sets} - ${match.p2Sets}`;
+      }
 
       // Inversione posizione visuale delle schede (Cambio campo)
       const card1 = document.getElementById('card-p1');
